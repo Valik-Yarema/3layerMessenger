@@ -1,61 +1,68 @@
-﻿using System;
+﻿using NlayerAppBLL.DTO;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
-using WebMessenger.Enities;
+using NlayerAppBLL.Interface;
 using WebMessenger.Models;
+using AutoMapper;
+using System.ComponentModel.DataAnnotations;
 
 namespace WebMessenger.Controllers
 {
     public class HomeController : Controller
     {
-        UserContext db = new UserContext();
-        public ActionResult Index()
+        IUserService userService;
+        public HomeController(IUserService serv)
         {
-            return View(db.Users.ToList());
+            userService = serv;
         }
+      //  UserContext db = new UserContext();
+       
 
-        public ActionResult MakeOrder(int? id)
+        public ActionResult Index(int? id)
         {
-            if (id == null)
-                return HttpNotFound();
-            User user = db.Users.Find(id);
-            if (user == null)
-                return HttpNotFound();
-           OrderViewModelUser orderModel = new OrderViewModelUser { UserId= user.UserId };
-            return View(orderModel);
+            IEnumerable<UserDTO> userDtos = userService.GetUsers();
+            var mapper = new MapperConfiguration(cfg => cfg.CreateMap<PhoneDTO, PhoneViewModel>()).CreateMapper();
+            var user = mapper.Map<IEnumerable<UserDTO>, List<UserViewModel>>(userDtos);
+
+            return View(user);
+        }
+      
+        public ActionResult MakeUser(int? id)
+        {
+            
+                try
+                {
+                    UserDTO user = userService.GetUser(id);
+                    var userV = new UserViewModel { UserId = user.UserId };
+                    return View(userV);
+                }
+                catch(ValidationException ex)
+                {
+                    return Content(ex.Message);
+                }
+                
         }
         [HttpPost]
-        public ActionResult MakeOrder(OrderViewModelUser orderModel)
+        public ActionResult MakeUser(UserViewModel order)
         {
-            if (ModelState.IsValid)
+            try
             {
-                User user = db.Users.Find(orderModel.UserId);
-                if (user== null)
-                    return HttpNotFound();
-            
-                /*    string sum = user.Name;
-                // если сегодня первое число месяца, тогда скидка в 10%
-                if (DateTime.Now.Day == 1)
-                    sum = sum + DateTime.Now.ToString();
-                */
-                Phone phone = new Phone
-                {
-                    PhoneId = user.UserId,
-                    PhoneNumber = orderModel.Name+orderModel.Password,
-                  
-                };
-                db.Phones.Add(phone);
-                db.SaveChanges();
-                return Content("<h2>Ваш телефон додано </h2>");
+                var orderDto = new UserDTO { UserId = order.UserId, Adress = order.Adress, Login = order.Login,Name=order.Name,Password=order.Password };
+            //    userService.MakeUser(orderDto);
+                return Content("<h2>Ваш заказ успешно оформлен</h2>");
             }
-            return View(orderModel);
+            catch (ValidationException ex)
+            {
+               // ModelState.AddModelError(ex.Property, ex.Message);
+            }
+            return View(order);
         }
-
         protected override void Dispose(bool disposing)
         {
-            db.Dispose();
+            userService.Dispose();
             base.Dispose(disposing);
         }
     }
